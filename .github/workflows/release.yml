@@ -1,3 +1,5 @@
+name: Publish Binaries on Release
+
 on:
   release:
     types: [created]
