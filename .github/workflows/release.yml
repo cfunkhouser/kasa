@@ -1,0 +1,53 @@
+name: Publish Binaries on Release
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  release-kasautil:
+    name: Release kasautil
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            artifact: kasautil-linux-amd64
+          - goos: linux
+            goarch: arm
+            goarm: 6
+            artifact: kasautil-linux-arm6
+          - goos: linux
+            goarch: arm
+            goarm: 7
+            artifact: kasautil-linux-arm7
+          - goos: darwin
+            goarch: amd64
+            artifact: kasautil-darwin-amd64
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build ${{ matrix.artifact }}
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+        run: |
+          go build -o ${{ matrix.artifact }} ./cmd/kasautil/
+          shasum -a 256 ${{ matrix.artifact }} >> SHA256SUM.txt
+      - name: Upload ${{ matrix.artifact }} to Release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{ matrix.artifact }}
+          asset_name: ${{ matrix.artifact }}
+          tag: ${{ github.ref }}
+          overwrite: true
+      - name: Upload SHA256SUM to Release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: SHA256SUM.txt
+          asset_name: SHA256SUM.txt
+          tag: ${{ github.ref }}
+          overwrite: true
