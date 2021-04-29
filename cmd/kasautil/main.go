@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -11,8 +10,6 @@ import (
 
 	"github.com/cfunkhouser/kasa"
 )
-
-var ErrNoDevices = errors.New("no devices detected")
 
 func setState(c *cli.Context, state bool) error {
 	addr := c.Args().First()

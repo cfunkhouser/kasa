@@ -86,7 +86,9 @@ func Receive(ctx context.Context, conn *net.UDPConn) ([]*APIMessage, error) {
 	var replies []*APIMessage
 	buf := make([]byte, 2048)
 	for {
-		conn.SetReadDeadline(time.Now().Add(time.Second))
+		if err := conn.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
+			return replies, err
+		}
 
 		n, raddr, err := conn.ReadFromUDP(buf)
 		if err != nil {
