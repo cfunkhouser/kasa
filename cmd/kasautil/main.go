@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/urfave/cli/v2"
@@ -11,16 +13,44 @@ import (
 	"github.com/cfunkhouser/kasa"
 )
 
-func setState(c *cli.Context, state bool) error {
-	addr := c.Args().First()
-	if addr == "" {
-		return cli.Exit("address is required", 1)
+func parseAddr(addr string) (*net.UDPAddr, error) {
+	s := strings.Split(addr, ":")
+	if len(s) != 2 {
+		return nil, fmt.Errorf("not sure what to do with %q, specify ip:port", addr)
 	}
-	raddr, err := net.ResolveUDPAddr("udp4", addr)
+	port, err := strconv.Atoi(s[1])
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("not sure what to do with port %q, specify ip:port", s[1])
 	}
-	return kasa.SetRelayState(c.Context, raddr, state)
+	ip := net.ParseIP(s[0])
+	if ip == nil {
+		return nil, fmt.Errorf("not sure what to do with IP %q, specify ip:port", s[0])
+	}
+	return &net.UDPAddr{
+		IP:   net.ParseIP(s[0]),
+		Port: port,
+	}, nil
+}
+
+func parseAddrs(c *cli.Context) (daddr, laddr *net.UDPAddr, err error) {
+	daddr, err = parseAddr(c.String("device"))
+	if err != nil {
+		return
+	}
+	if l := c.String("local"); l != "" {
+		if laddr, err = parseAddr(l); err != nil {
+			return
+		}
+	}
+	return
+}
+
+func setState(c *cli.Context, state bool) error {
+	daddr, laddr, err := parseAddrs(c)
+	if err != nil {
+		return cli.Exit(err, 1)
+	}
+	return kasa.SetRelayState(c.Context, daddr, laddr, state)
 }
 
 func main() {
@@ -30,10 +60,27 @@ func main() {
 		Commands: []*cli.Command{
 			{
 				Name:    "list",
-				Aliases: []string{"ls", "l"},
+				Aliases: []string{"ls"},
 				Usage:   "List kasa devices on the local network.",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:    "device",
+						Aliases: []string{"d", "discover"},
+						Usage:   "Broadcast ip:port target for discovery requests",
+						Value:   "255.255.255.255:9999",
+					},
+					&cli.StringFlag{
+						Name:    "local",
+						Usage:   "Local ip:port from which to send discovery requests",
+						Aliases: []string{"L"},
+					},
+				},
 				Action: func(c *cli.Context) error {
-					infos, err := kasa.Discover(c.Context)
+					daddr, laddr, err := parseAddrs(c)
+					if err != nil {
+						return cli.Exit(err, 1)
+					}
+					infos, err := kasa.GetSystemInformation(c.Context, daddr, laddr, false)
 					if err != nil {
 						return err
 					}
