@@ -12,17 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Build kasautil
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          GOARM: ${{ matrix.goarm }}
-        run: |
-          echo -n > SHA256SUM.txt
-          env GOOS=darwin GOARCH=amd64 go build -o kasautil-darwin-amd64 ./cmd/kasautil/
-          env GOOS=linux GOARCH=amd64 go build -o kasautil-linux-amd64 ./cmd/kasautil/
-          env GOOS=linux GOARCH=arm GOARM=6 go build -o kasautil-linux-arm6 ./cmd/kasautil/
-          env GOOS=linux GOARCH=arm GOARM=7 go build -o kasautil-linux-arm7 ./cmd/kasautil/
-          shasum -a 256 kasautil-* >> SHA256SUM.txt
+        run: make all
       - name: Release kasautil
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
@@ -34,4 +24,5 @@ jobs:
             kasautil-linux-amd64
             kasautil-linux-arm6
             kasautil-linux-arm7
+            SHA1SUM.txt
             SHA256SUM.txt
