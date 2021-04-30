@@ -8,3 +8,4 @@
 
 # Ignore locally-built binaries.
 kasautil-*
+SHA*SUM.txt

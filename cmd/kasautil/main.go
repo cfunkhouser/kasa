@@ -61,10 +61,13 @@ var commonFlags = []cli.Flag{
 	},
 }
 
+var Version = "development"
+
 func main() {
 	app := &cli.App{
-		Name:  "kasautil",
-		Usage: "Control Kasa devices on the local network",
+		Name:    "kasautil",
+		Usage:   "Control Kasa devices on the local network",
+		Version: Version,
 		Commands: []*cli.Command{
 			{
 				Name:    "list",
