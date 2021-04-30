@@ -1,53 +1,37 @@
 name: Publish Binaries on Release
 
 on:
-  release:
-    types: [created]
+  push:
+    tags:
+      - v*
 
 jobs:
   release-kasautil:
     name: Release kasautil
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - goos: linux
-            goarch: amd64
-            artifact: kasautil-linux-amd64
-          - goos: linux
-            goarch: arm
-            goarm: 6
-            artifact: kasautil-linux-arm6
-          - goos: linux
-            goarch: arm
-            goarm: 7
-            artifact: kasautil-linux-arm7
-          - goos: darwin
-            goarch: amd64
-            artifact: kasautil-darwin-amd64
     steps:
       - uses: actions/checkout@v2
-      - name: Build ${{ matrix.artifact }}
+      - name: Build kasautil
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           GOARM: ${{ matrix.goarm }}
         run: |
-          go build -o ${{ matrix.artifact }} ./cmd/kasautil/
-          shasum -a 256 ${{ matrix.artifact }} >> SHA256SUM.txt
-      - name: Upload ${{ matrix.artifact }} to Release
-        uses: svenstaro/upload-release-action@v2
+          echo -n > SHA256SUM.txt
+          env GOOS=darwin GOARCH=amd64 go build -o kasautil-darwin-amd64 ./cmd/kasautil/
+          env GOOS=linux GOARCH=amd64 go build -o kasautil-linux-amd64 ./cmd/kasautil/
+          env GOOS=linux GOARCH=arm GOARM=6 go build -o kasautil-linux-arm6 ./cmd/kasautil/
+          env GOOS=linux GOARCH=arm GOARM=7 go build -o kasautil-linux-arm7 ./cmd/kasautil/
+          shasum -a 256 kasautil-* >> SHA256SUM.txt
+      - name: Release kasautil
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ${{ matrix.artifact }}
-          asset_name: ${{ matrix.artifact }}
-          tag: ${{ github.ref }}
-          overwrite: true
-      - name: Upload SHA256SUM to Release
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: SHA256SUM.txt
-          asset_name: SHA256SUM.txt
-          tag: ${{ github.ref }}
-          overwrite: true
+          files: |
+            kasautil-darwin-amd64
+            kasautil-linux-amd64
+            kasautil-linux-arm6
+            kasautil-linux-arm7
+            SHA256SUM.txt
