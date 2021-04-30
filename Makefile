@@ -1,7 +1,7 @@
 .PHONY = all clean
 
 PLATFORMS := linux-arm6 linux-arm7 linux-amd64 darwin-amd64
-VERSION := $(shell git describe --always --dirty="-dev-$$(git rev-parse --short HEAD)")
+VERSION := $(shell git describe --always --tags --dirty="-dev-$$(git rev-parse --short HEAD)")
 MAIN := ./cmd/kasautil
 
 BUILDCMD := go build -o
