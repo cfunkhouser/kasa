@@ -81,8 +81,8 @@ func DecodeAPIMessage(raw []byte, message *APIMessage) error {
 	return json.Unmarshal(decrypt(raw), message)
 }
 
-// Receive attempts to read APIMessages from a UDP connection.
-func Receive(ctx context.Context, conn *net.UDPConn) ([]*APIMessage, error) {
+// receive attempts to read APIMessages from a UDP connection.
+func receive(ctx context.Context, conn *net.UDPConn) ([]*APIMessage, error) {
 	var replies []*APIMessage
 	buf := make([]byte, 2048)
 	for {
@@ -111,24 +111,24 @@ func Receive(ctx context.Context, conn *net.UDPConn) ([]*APIMessage, error) {
 
 // Send an APIMessage to a UDP address. The address can be either an individual
 // Kasa device's address, or a broadcast address. If expectResponse is true, then
-// Receive is called and any responses are returned. If expectResponse is false,
+// receive is called and any responses are returned. If expectResponse is false,
 // the returned APIMessage slice will always be nil.
-func Send(ctx context.Context, message *APIMessage, addr *net.UDPAddr, expectResponse bool) ([]*APIMessage, error) {
+func Send(ctx context.Context, message *APIMessage, raddr, laddr *net.UDPAddr, expectResponse bool) ([]*APIMessage, error) {
 	msg, err := message.Encode()
 	if err != nil {
 		return nil, err
 	}
-	conn, err := net.ListenUDP("udp4", nil)
+	conn, err := net.ListenUDP("udp4", laddr)
 	if err != nil {
 		return nil, err
 	}
-	if _, err = conn.WriteToUDP(msg, addr); err != nil {
+	if _, err = conn.WriteToUDP(msg, raddr); err != nil {
 		return nil, err
 	}
 	if !expectResponse {
 		return nil, nil
 	}
-	return Receive(ctx, conn)
+	return receive(ctx, conn)
 }
 
 // ErrGetSysinfoFailed is returned by a Kasa device when get_sysinfo fails.
@@ -193,13 +193,13 @@ func (i *SystemInformation) FromAPIMessage(msg *APIMessage) error {
 
 // GetSystemInformation sends a get_sysinfo request to the UDP address, and
 // returns any responses received before the deadline.
-func GetSystemInformation(ctx context.Context, addr *net.UDPAddr, allOrNothing bool) ([]*SystemInformation, error) {
+func GetSystemInformation(ctx context.Context, raddr, laddr *net.UDPAddr, allOrNothing bool) ([]*SystemInformation, error) {
 	message := &APIMessage{
 		System: map[string]interface{}{
 			"get_sysinfo": nil,
 		},
 	}
-	replies, err := Send(ctx, message, addr, true)
+	replies, err := Send(ctx, message, raddr, laddr, true)
 	if err != nil {
 		return nil, err
 	}
@@ -217,23 +217,12 @@ func GetSystemInformation(ctx context.Context, addr *net.UDPAddr, allOrNothing b
 	return r, nil
 }
 
-// Discover is a helper function which calls GetSystemInformation with a broadcast
-// address. It will return SystemInformation responses for any Kasa devices on the
-// local network.
-func Discover(ctx context.Context) ([]*SystemInformation, error) {
-	discoveryAddr, err := net.ResolveUDPAddr("udp4", "255.255.255.255:9999")
-	if err != nil {
-		return nil, err
-	}
-	return GetSystemInformation(ctx, discoveryAddr, false)
-}
-
 type setRelayStateRequest struct {
 	State bool `json:"state" mapstructure:"state"`
 }
 
 // SetRelayState on the specified address.
-func SetRelayState(ctx context.Context, addr *net.UDPAddr, state bool) error {
+func SetRelayState(ctx context.Context, raddr, laddr *net.UDPAddr, state bool) error {
 	message := &APIMessage{
 		System: map[string]interface{}{
 			"set_relay_state": setRelayStateRequest{
@@ -241,6 +230,6 @@ func SetRelayState(ctx context.Context, addr *net.UDPAddr, state bool) error {
 			},
 		},
 	}
-	_, err := Send(ctx, message, addr, false)
+	_, err := Send(ctx, message, raddr, laddr, false)
 	return err
 }
