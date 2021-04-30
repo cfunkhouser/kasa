@@ -53,6 +53,14 @@ func setState(c *cli.Context, state bool) error {
 	return kasa.SetRelayState(c.Context, daddr, laddr, state)
 }
 
+var commonFlags = []cli.Flag{
+	&cli.StringFlag{
+		Name:    "local",
+		Usage:   "Local ip:port from which to send discovery requests",
+		Aliases: []string{"L"},
+	},
+}
+
 func main() {
 	app := &cli.App{
 		Name:  "kasautil",
@@ -62,19 +70,12 @@ func main() {
 				Name:    "list",
 				Aliases: []string{"ls"},
 				Usage:   "List kasa devices on the local network.",
-				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name:    "device",
-						Aliases: []string{"d", "discover"},
-						Usage:   "Broadcast ip:port target for discovery requests",
-						Value:   "255.255.255.255:9999",
-					},
-					&cli.StringFlag{
-						Name:    "local",
-						Usage:   "Local ip:port from which to send discovery requests",
-						Aliases: []string{"L"},
-					},
-				},
+				Flags: append(commonFlags, &cli.StringFlag{
+					Name:    "device",
+					Aliases: []string{"d", "discover"},
+					Usage:   "Broadcast ip:port target for discovery requests",
+					Value:   "255.255.255.255:9999",
+				}),
 				Action: func(c *cli.Context) error {
 					daddr, laddr, err := parseAddrs(c)
 					if err != nil {
@@ -102,17 +103,27 @@ func main() {
 				},
 			},
 			{
-				Name:      "off",
-				Usage:     `Set a kasa device to "off"`,
-				ArgsUsage: "[address]",
+				Name:  "off",
+				Usage: `Set a kasa device to "off"`,
+				Flags: append(commonFlags, &cli.StringFlag{
+					Name:     "device",
+					Aliases:  []string{"d"},
+					Required: true,
+					Usage:    "ip:port of Kasa device",
+				}),
 				Action: func(c *cli.Context) error {
 					return setState(c, false)
 				},
 			},
 			{
-				Name:      "on",
-				Usage:     `Set a kasa device to "on"`,
-				ArgsUsage: "[address]",
+				Name:  "on",
+				Usage: `Set a kasa device to "on"`,
+				Flags: append(commonFlags, &cli.StringFlag{
+					Name:     "device",
+					Aliases:  []string{"d"},
+					Required: true,
+					Usage:    "ip:port of Kasa device",
+				}),
 				Action: func(c *cli.Context) error {
 					return setState(c, true)
 				},
