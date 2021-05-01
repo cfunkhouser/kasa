@@ -24,6 +24,6 @@ jobs:
             kasautil-linux-amd64
             kasautil-linux-arm6
             kasautil-linux-arm7
-            kasautil-linux-i386
+            kasautil-linux-386
             SHA1SUM.txt
             SHA256SUM.txt
