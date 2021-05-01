@@ -1,6 +1,6 @@
 .PHONY = all clean
 
-PLATFORMS := linux-arm6 linux-arm7 linux-amd64 darwin-amd64
+PLATFORMS := linux-arm6 linux-arm7 linux-amd64 linux-386 darwin-amd64
 VERSION := $(shell git describe --always --tags --dirty="-dev-$$(git rev-parse --short HEAD)")
 MAIN := ./cmd/kasautil
 
@@ -19,8 +19,8 @@ all: $(TARGETS) $(SUMS)
 kasautil-linux-arm%:
 	env GOOS=linux GOARCH=arm GOARM=$* $(BUILDCMD) $@ $(MAIN)
 
-kasautil-linux-amd64:
-	env GOOS=linux GOARCH=amd64 $(BUILDCMD) $@ $(MAIN)
+kasautil-linux-%:
+	env GOOS=linux GOARCH=$* $(BUILDCMD) $@ $(MAIN)
 
 kasautil-darwin-%:
 	env GOOS=darwin GOARCH=$* $(BUILDCMD) $@ $(MAIN)
