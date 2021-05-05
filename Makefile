@@ -6,7 +6,7 @@ MAIN := ./cmd/kasautil
 
 BUILDCMD := go build -o
 ifneq ($(strip $(VERSION)),)
-	BUILDCMD := go build -ldflags="-X 'main.Version=$(VERSION)'" -o
+	BUILDCMD := go build -ldflags="-X 'github.com/cfunkhouser/kasa.Version=$(VERSION)'" -o
 endif
 
 
