@@ -15,12 +15,15 @@ import (
 	"github.com/cfunkhouser/kasa/export"
 )
 
+// Version of kasautil.
+var Version = "development"
+
 var (
 	versionMetric = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "kasa_exporter_version",
 		Help: "Version information about this binary",
 		ConstLabels: map[string]string{
-			"version": kasa.Version,
+			"version": Version,
 		},
 	})
 )
@@ -69,8 +72,6 @@ var commonFlags = []cli.Flag{
 		Aliases: []string{"L"},
 	},
 }
-
-var Version = "development"
 
 func main() {
 	app := &cli.App{
