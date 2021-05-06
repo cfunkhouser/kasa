@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -35,6 +37,26 @@ func decrypt(data []byte) []byte {
 		key = data[i]
 	}
 	return out
+}
+
+// ParseAddr from host:port string.
+func ParseAddr(addr string) (*net.UDPAddr, error) {
+	s := strings.Split(addr, ":")
+	if len(s) != 2 {
+		return nil, fmt.Errorf("not sure what to do with %q, specify ip:port", addr)
+	}
+	port, err := strconv.Atoi(s[1])
+	if err != nil {
+		return nil, fmt.Errorf("not sure what to do with port %q, specify ip:port", s[1])
+	}
+	ip := net.ParseIP(s[0])
+	if ip == nil {
+		return nil, fmt.Errorf("not sure what to do with IP %q, specify ip:port", s[0])
+	}
+	return &net.UDPAddr{
+		IP:   net.ParseIP(s[0]),
+		Port: port,
+	}, nil
 }
 
 // APIMessage wraps requests to and responses from Kasa devices. Does not

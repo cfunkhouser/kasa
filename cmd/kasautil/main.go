@@ -3,47 +3,29 @@ package main
 import (
 	"fmt"
 	"net"
+	"net/http"
 	"os"
-	"strconv"
-	"strings"
-	"text/tabwriter"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/urfave/cli/v2"
 
 	"github.com/cfunkhouser/kasa"
+	"github.com/cfunkhouser/kasa/export"
 )
 
-func parseAddr(addr string) (*net.UDPAddr, error) {
-	s := strings.Split(addr, ":")
-	if len(s) != 2 {
-		return nil, fmt.Errorf("not sure what to do with %q, specify ip:port", addr)
-	}
-	port, err := strconv.Atoi(s[1])
-	if err != nil {
-		return nil, fmt.Errorf("not sure what to do with port %q, specify ip:port", s[1])
-	}
-	ip := net.ParseIP(s[0])
-	if ip == nil {
-		return nil, fmt.Errorf("not sure what to do with IP %q, specify ip:port", s[0])
-	}
-	return &net.UDPAddr{
-		IP:   net.ParseIP(s[0]),
-		Port: port,
-	}, nil
-}
+// Version of kasautil. Set at build time to something meaningful.
+var Version = "development"
 
-func parseAddrs(c *cli.Context) (daddr, laddr *net.UDPAddr, err error) {
-	daddr, err = parseAddr(c.String("device"))
-	if err != nil {
-		return
-	}
-	if l := c.String("local"); l != "" {
-		if laddr, err = parseAddr(l); err != nil {
-			return
-		}
-	}
-	return
-}
+var (
+	versionMetric = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "kasa_exporter_version",
+		Help: "Version information about this binary",
+		ConstLabels: map[string]string{
+			"version": Version,
+		},
+	})
+)
 
 func setState(c *cli.Context, state bool) error {
 	daddr, laddr, err := parseAddrs(c)
@@ -53,6 +35,22 @@ func setState(c *cli.Context, state bool) error {
 	return kasa.SetRelayState(c.Context, daddr, laddr, state)
 }
 
+func serveExporter(c *cli.Context) error {
+	var laddr *net.UDPAddr
+	if l := c.String("local"); l != "" {
+		var err error
+		if laddr, err = kasa.ParseAddr(l); err != nil {
+			return err
+		}
+	}
+	r := prometheus.NewRegistry()
+	r.Register(versionMetric)
+	versionMetric.Set(1.0)
+	http.Handle("/metrics", promhttp.HandlerFor(r, promhttp.HandlerOpts{}))
+	http.Handle("/scrape", export.New(export.WithLocalAddr(laddr)))
+	return http.ListenAndServe(":9142", nil)
+}
+
 var commonFlags = []cli.Flag{
 	&cli.StringFlag{
 		Name:    "local",
@@ -60,8 +58,6 @@ var commonFlags = []cli.Flag{
 		Aliases: []string{"L"},
 	},
 }
-
-var Version = "development"
 
 func main() {
 	app := &cli.App{
@@ -73,14 +69,32 @@ func main() {
 				Name:    "list",
 				Aliases: []string{"ls"},
 				Usage:   "List kasa devices on the local network.",
-				Flags: append(commonFlags, &cli.StringFlag{
-					Name:    "device",
-					Aliases: []string{"d", "discover"},
-					Usage:   "Broadcast ip:port target for discovery requests",
-					Value:   "255.255.255.255:9999",
-				}),
+				Flags: append(
+					commonFlags,
+					&cli.StringFlag{
+						Name:    "device",
+						Aliases: []string{"d", "discover"},
+						Usage:   "Broadcast ip:port target for discovery requests",
+						Value:   "255.255.255.255:9999",
+					},
+					&cli.StringFlag{
+						Name:    "format",
+						Aliases: []string{"f"},
+						Usage:   "Possible values: promsd, human",
+						Value:   "human",
+					},
+					&cli.StringFlag{
+						Name:    "output",
+						Aliases: []string{"o"},
+						Usage:   "File to which output is written. If unset, use STDOUT.",
+					},
+				),
 				Action: func(c *cli.Context) error {
 					daddr, laddr, err := parseAddrs(c)
+					if err != nil {
+						return cli.Exit(err, 1)
+					}
+					format, err := parseFormatter(c)
 					if err != nil {
 						return cli.Exit(err, 1)
 					}
@@ -88,20 +102,14 @@ func main() {
 					if err != nil {
 						return err
 					}
-					if len(infos) == 0 {
-						fmt.Println("No devices detected on local network")
-						return nil
+					// Parse and open the output file _after_ the network call,
+					// so that if it fails, we don't truncate an extant file with
+					// garbage.
+					out, err := parseOutFile(c)
+					if err != nil {
+						return cli.Exit(err, 1)
 					}
-					w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', tabwriter.DiscardEmptyColumns)
-					fmt.Fprintln(w, "Address\tAlias\tState")
-					for _, info := range infos {
-						state := "Off"
-						if info.RelayState == 1 {
-							state = "On"
-						}
-						fmt.Fprintf(w, "%v\t%v\t%v\n", info.RemoteAddress, info.Alias, state)
-					}
-					w.Flush()
+					format(out, infos)
 					return nil
 				},
 			},
@@ -130,6 +138,12 @@ func main() {
 				Action: func(c *cli.Context) error {
 					return setState(c, true)
 				},
+			},
+			{
+				Name:   "export",
+				Usage:  "Export Kasa metrics to Prometheus. Blocks until killed.",
+				Flags:  commonFlags,
+				Action: serveExporter,
 			},
 		},
 	}
