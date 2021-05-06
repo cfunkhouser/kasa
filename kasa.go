@@ -14,9 +14,6 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
-// Version of this library.
-var Version = "development"
-
 // The following encrypt and decrupt functions are taken from
 // https://github.com/joeshaw/kasa-homekit
 
