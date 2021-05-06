@@ -32,7 +32,7 @@ func human(out io.Writer, infos []*kasa.SystemInformation) {
 }
 
 type fileSDConfig struct {
-	Targets []string          `json:"targets,omitemtpy" yaml:"targets"`
+	Targets []string          `json:"targets,omitempty" yaml:"targets"`
 	Labels  map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 }
 

@@ -44,7 +44,9 @@ func serveExporter(c *cli.Context) error {
 		}
 	}
 	r := prometheus.NewRegistry()
-	r.Register(versionMetric)
+	if err := r.Register(versionMetric); err != nil {
+		return err
+	}
 	versionMetric.Set(1.0)
 	http.Handle("/metrics", promhttp.HandlerFor(r, promhttp.HandlerOpts{}))
 	http.Handle("/scrape", export.New(export.WithLocalAddr(laddr)))
