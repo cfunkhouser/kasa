@@ -5,7 +5,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"text/tabwriter"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -39,6 +38,17 @@ func parseAddrs(c *cli.Context) (daddr, laddr *net.UDPAddr, err error) {
 		}
 	}
 	return
+}
+
+func parseFormatter(c *cli.Context) (formatter, error) {
+	f := c.String("format")
+	switch f {
+	case "promsd":
+		return promFileSD, nil
+	case "", "human":
+		return human, nil
+	}
+	return human, fmt.Errorf("unsupported format %q", f)
 }
 
 func setState(c *cli.Context, state bool) error {
@@ -83,14 +93,26 @@ func main() {
 				Name:    "list",
 				Aliases: []string{"ls"},
 				Usage:   "List kasa devices on the local network.",
-				Flags: append(commonFlags, &cli.StringFlag{
-					Name:    "device",
-					Aliases: []string{"d", "discover"},
-					Usage:   "Broadcast ip:port target for discovery requests",
-					Value:   "255.255.255.255:9999",
-				}),
+				Flags: append(
+					commonFlags,
+					&cli.StringFlag{
+						Name:    "device",
+						Aliases: []string{"d", "discover"},
+						Usage:   "Broadcast ip:port target for discovery requests",
+						Value:   "255.255.255.255:9999",
+					},
+					&cli.StringFlag{
+						Name:    "format",
+						Aliases: []string{"f"},
+						Usage:   "Possible values: promsd, human",
+						Value:   "human",
+					}),
 				Action: func(c *cli.Context) error {
 					daddr, laddr, err := parseAddrs(c)
+					if err != nil {
+						return cli.Exit(err, 1)
+					}
+					format, err := parseFormatter(c)
 					if err != nil {
 						return cli.Exit(err, 1)
 					}
@@ -98,20 +120,7 @@ func main() {
 					if err != nil {
 						return err
 					}
-					if len(infos) == 0 {
-						fmt.Println("No devices detected on local network")
-						return nil
-					}
-					w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', tabwriter.DiscardEmptyColumns)
-					fmt.Fprintln(w, "Address\tAlias\tState")
-					for _, info := range infos {
-						state := "Off"
-						if info.RelayState == 1 {
-							state = "On"
-						}
-						fmt.Fprintf(w, "%v\t%v\t%v\n", info.RemoteAddress, info.Alias, state)
-					}
-					w.Flush()
+					format(os.Stdout, infos)
 					return nil
 				},
 			},
