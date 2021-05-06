@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -49,6 +50,13 @@ func parseFormatter(c *cli.Context) (formatter, error) {
 		return human, nil
 	}
 	return human, fmt.Errorf("unsupported format %q", f)
+}
+
+func parseOutFile(c *cli.Context) (io.Writer, error) {
+	if o := c.String("output"); o != "" {
+		return os.Create(o)
+	}
+	return os.Stdout, nil
 }
 
 func setState(c *cli.Context, state bool) error {
@@ -106,7 +114,13 @@ func main() {
 						Aliases: []string{"f"},
 						Usage:   "Possible values: promsd, human",
 						Value:   "human",
-					}),
+					},
+					&cli.StringFlag{
+						Name:    "output",
+						Aliases: []string{"o"},
+						Usage:   "File to which output is written. If unset, use STDOUT.",
+					},
+				),
 				Action: func(c *cli.Context) error {
 					daddr, laddr, err := parseAddrs(c)
 					if err != nil {
@@ -120,7 +134,14 @@ func main() {
 					if err != nil {
 						return err
 					}
-					format(os.Stdout, infos)
+					// Parse and open the output file _after_ the network call,
+					// so that if it fails, we don't truncate an extant file with
+					// garbage.
+					out, err := parseOutFile(c)
+					if err != nil {
+						return cli.Exit(err, 1)
+					}
+					format(out, infos)
 					return nil
 				},
 			},
