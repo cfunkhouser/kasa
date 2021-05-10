@@ -14,10 +14,10 @@ import (
 	"github.com/cfunkhouser/kasa/export"
 )
 
-// Version of kasautil. Set at build time to something meaningful.
-var Version = "development"
-
 var (
+	// Version of kasautil. Set at build time to something meaningful.
+	Version = "development"
+
 	versionMetric = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "kasa_exporter_version",
 		Help: "Version information about this binary",
@@ -25,6 +25,8 @@ var (
 			"version": Version,
 		},
 	})
+
+	defaultPromMetricsAddress = ":9142"
 )
 
 func setState(c *cli.Context, state bool) error {
@@ -50,7 +52,7 @@ func serveExporter(c *cli.Context) error {
 	versionMetric.Set(1.0)
 	http.Handle("/metrics", promhttp.HandlerFor(r, promhttp.HandlerOpts{}))
 	http.Handle("/scrape", export.New(export.WithLocalAddr(laddr)))
-	return http.ListenAndServe(":9142", nil)
+	return http.ListenAndServe(c.String("metricsaddress"), nil)
 }
 
 var commonFlags = []cli.Flag{
@@ -142,9 +144,14 @@ func main() {
 				},
 			},
 			{
-				Name:   "export",
-				Usage:  "Export Kasa metrics to Prometheus. Blocks until killed.",
-				Flags:  commonFlags,
+				Name:  "export",
+				Usage: "Export Kasa metrics to Prometheus. Blocks until killed.",
+				Flags: append(commonFlags, &cli.StringFlag{
+					Name:    "metricsaddress",
+					Aliases: []string{"a"},
+					Value:   defaultPromMetricsAddress,
+					Usage:   "ip:port from which to serve Prometheus metrics",
+				}),
 				Action: serveExporter,
 			},
 		},
