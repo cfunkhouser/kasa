@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -26,6 +27,7 @@ var (
 		},
 	})
 
+	defaultCycleSleep         = time.Second * 15
 	defaultPromMetricsAddress = ":9142"
 )
 
@@ -140,6 +142,30 @@ func main() {
 					Usage:    "ip:port of Kasa device",
 				}),
 				Action: func(c *cli.Context) error {
+					return setState(c, true)
+				},
+			},
+			{
+				Name:  "cycle",
+				Usage: `Turn a kasa device "off" and then "on." Will end by setting "on" regardless of starting state.`,
+				Flags: append(commonFlags,
+					&cli.StringFlag{
+						Name:     "device",
+						Aliases:  []string{"d"},
+						Required: true,
+						Usage:    "ip:port of Kasa device",
+					},
+					&cli.DurationFlag{
+						Name:    "sleep",
+						Aliases: []string{"s"},
+						Value:   defaultCycleSleep,
+						Usage:   `Time to wait between setting device "off" and "on"`,
+					}),
+				Action: func(c *cli.Context) error {
+					if err := setState(c, false); err != nil {
+						return err
+					}
+					time.Sleep(c.Duration("sleep"))
 					return setState(c, true)
 				},
 			},
